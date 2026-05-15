@@ -4,6 +4,8 @@ Add, edit, save, and delete protected files and folders with sudo/root privilege
 
 If you frequently work on remote Linux servers and need to edit system configuration files (like `/etc/nginx/nginx.conf` or `/etc/fstab`), this extension saves you from having to drop into the terminal to use `nano` or `vim`. You can manage protected files directly from the comfort of the VS Code editor!
 
+![Screenshot](https://raw.githubusercontent.com/rezbouchabou/sudo-remote-ssh/main/screenshot.png)
+
 ## Features
 
 This extension adds several commands to VS Code, allowing you to bypass permission denied errors seamlessly:
