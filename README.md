@@ -1,4 +1,4 @@
-# Sudo Remote - SSH
+# Sudo for Remote - SSH 
 
 Add, edit, save, and delete protected files and folders with sudo/root privileges while using the VS Code Remote - SSH extension.
 

@@ -1,6 +1,6 @@
 {
-  "name": "sudo-remote-ssh",
-  "displayName": "Sudo Remote - SSH",
+  "name": "remote-ssh-sudo",
+  "displayName": "Sudo for Remote - SSH",
   "description": "Add, edit, save, and delete protected files with sudo/root privileges.",
   "version": "1.0.0",
   "publisher": "rezbouchabou",
@@ -83,16 +83,6 @@
     "menus": {
       "explorer/context": [
         {
-          "command": "sudo-remote-ssh.saveFile",
-          "when": "explorerResourceIsFile",
-          "group": "7_modification@1"
-        },
-        {
-          "command": "sudo-remote-ssh.saveFileAsSpecifiedUser",
-          "when": "explorerResourceIsFile",
-          "group": "7_modification@1"
-        },
-        {
           "command": "sudo-remote-ssh.newFile",
           "when": "explorerResourceIsFolder",
           "group": "7_modification@1"
@@ -105,16 +95,16 @@
         {
           "command": "sudo-remote-ssh.newFileAsSpecifiedUser",
           "when": "explorerResourceIsFolder",
-          "group": "7_modification@2"
+          "group": "7_modification@3"
         },
         {
           "command": "sudo-remote-ssh.newFolderAsSpecifiedUser",
           "when": "explorerResourceIsFolder",
-          "group": "7_modification@2"
+          "group": "7_modification@4"
         },
         {
           "command": "sudo-remote-ssh.deleteFileOrFolder",
-          "group": "7_modification@3"
+          "group": "7_modification@5"
         }
       ]
     }
