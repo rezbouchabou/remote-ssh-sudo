@@ -1,6 +1,6 @@
 # Sudo for Remote - SSH 
 
-Add, edit, save, delete, compress, extract, and change permissions/ownership of protected files and folders with sudo/root privileges while using the VS Code Remote - SSH extension.
+Add, edit, save, delete, move, compress, extract, and change permissions/ownership of protected files and folders with sudo/root privileges while using the VS Code Remote - SSH extension.
 
 If you frequently work on remote Linux servers and need to edit system configuration files (like `/etc/nginx/nginx.conf` or `/etc/fstab`), or fix web server file ownership (like `www-data`), this extension saves you from having to drop into the terminal. You can manage protected files, directories, and their permissions directly from the comfort of the VS Code editor!
 
@@ -10,16 +10,18 @@ If you frequently work on remote Linux servers and need to edit system configura
 
 This extension adds several commands to VS Code, allowing you to bypass permission denied errors seamlessly:
 
-*   **Save as Root / Specified User:** Save the currently open protected file using `sudo`. Icons appear in the **Editor Actions Title bar** for quick access!
+* **Save as Root / Specified User:** Save the currently open protected file using `sudo`. Icons appear in the **Editor Actions Title bar** for quick access! (Default Hotkey: `Ctrl+Shift+Alt+S`)
 
-![Screenshot](https://raw.githubusercontent.com/rezbouchabou/remote-ssh-sudo/main/images/editor-actions.png)
+![Screenshot](https://raw.githubusercontent.com/rezbouchabou/remote-ssh-sudo/main/images/editor.png)
 
-*   **New File / Folder as Root / Specified User:** Create new files or nested directories anywhere on the remote file system.
-*   **Delete Permanently as Root:** Permanently delete protected files or directories (runs `rm -rf`). Supports multi-select!
-*   **Change Permissions (chmod):** Quickly apply new numeric or symbolic permissions to any file or folder.
-*   **Change Owner/Group (chown):** Easily reassign the user and group ownership of a file or folder.
-*   **Compress & Extract:** Instantly zip/unzip or tar/untar files and directories directly from the context menu.
-*   **Recursive Operations:** Automatically detects if you are modifying a folder's permissions or ownership and interactively asks if you want to apply the changes recursively (`-R`).
+* **Multi-Selection Support:** Apply actions (Delete, Compress, Chmod, Chown, Move) to dozens of files and folders at the exact same time.
+* **Move as Root:** Move protected files or directories with smart path prediction and automatic destination folder creation.
+* **New File / Folder as Root / Specified User:** Create new files or nested directories anywhere on the remote file system.
+* **Delete as Root:** Permanently delete protected files or directories (runs `rm -rf`). 
+* **Change Permissions (chmod):** Quickly apply new numeric or symbolic permissions to any file or folder.
+* **Change Owner/Group (chown):** Easily reassign the user and group ownership of a file or folder.
+* **Compress & Extract:** Instantly zip/unzip or tar/untar files directly from the context menu with visual progress bars.
+* **Recursive Operations:** Automatically detects if you are modifying a folder's permissions or ownership and interactively asks if you want to apply the changes recursively (`-R`).
 
 ### Explorer Context Menu Integration
 You don't need to memorize commands! You can simply right-click in the VS Code File Explorer to access the full suite of management tools.

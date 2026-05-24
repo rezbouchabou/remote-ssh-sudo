@@ -75,8 +75,13 @@ const withProgress = async (title, operation) => {
     );
 };
 
+// ============================================================================
+// HELPER FUNCTIONS FOR SUDO OPERATIONS
+// ============================================================================
+
 /**
  * Creates a promise wrapper for sudo operations with timeout and password handling
+ * Eliminates code duplication across sudo functions
  */
 const createSudoPromise = (sudoCommand, additionalArgs, operationName) => {
     const timeout = getTimeout();
@@ -283,6 +288,26 @@ const sudoWriteFile = async (filename, content, user) => {
             }
         });
     });
+};
+
+/**
+ * Move files/folders with sudo
+ * @param {string[]} targetPaths
+ * @param {string} destPath
+ * @param {string} user
+ * @returns {Promise<void>}
+ */
+const sudoMove = async (targetPaths, destPath, user) => {
+    const sudoCommand = getSudoCommand();
+    const userArgs = user === "root" ? [] : ["-u", user];
+
+    log(`Moving ${targetPaths.length} item(s) to ${destPath} as user: ${user}`, "DEBUG");
+
+    return createSudoPromise(
+        sudoCommand,
+        [...userArgs, "mv", ...targetPaths, destPath],
+        `Move ${targetPaths.length > 1 ? targetPaths.length + " items" : "item"}`
+    );
 };
 
 /**
@@ -652,7 +677,111 @@ exports.activate = (context) => {
         })
     );
 
-    // Command 7: Delete File(s) or Folder(s)
+    // Command 7: Move File(s) or Folder(s) as Root
+    context.subscriptions.push(
+        vscode.commands.registerCommand("remote-ssh-sudo.move", async (uri, selectedUris) => {
+            try {
+                let urisToMove = [];
+
+                if (selectedUris && Array.isArray(selectedUris) && selectedUris.length > 0) {
+                    urisToMove = selectedUris;
+                } else if (uri) {
+                    urisToMove = [uri];
+                } else if (vscode.window.activeTextEditor) {
+                    urisToMove = [vscode.window.activeTextEditor.document.uri];
+                }
+
+                urisToMove = urisToMove.filter((u) => u.scheme === "file");
+
+                if (urisToMove.length === 0) {
+                    vscode.window.showErrorMessage(`${PREFIX} No file or folder selected to move.`);
+                    return;
+                }
+
+                const targetPaths = urisToMove.map((u) => u.fsPath);
+                const moveMessage =
+                    targetPaths.length === 1 ? `'${path.basename(targetPaths[0])}'` : `${targetPaths.length} items`;
+
+                // Default Path: Try to get the workspace folder, or fallback to the file's parent folder
+                let defaultDestPath = "";
+                const activeWorkspace = vscode.workspace.getWorkspaceFolder(urisToMove[0]);
+                if (activeWorkspace) {
+                    defaultDestPath = activeWorkspace.uri.fsPath + path.sep;
+                } else {
+                    defaultDestPath = path.dirname(targetPaths[0]) + path.sep;
+                }
+
+                // Ask for destination
+                const destPath = await vscode.window.showInputBox({
+                    prompt: `Move ${moveMessage} to (folder will be created if missing):`,
+                    value: defaultDestPath,
+                    valueSelection: [defaultDestPath.length, defaultDestPath.length],
+                    ignoreFocusOut: true
+                });
+
+                if (!destPath) return;
+
+                // Validate destination is not empty
+                if (!destPath.trim()) {
+                    vscode.window.showErrorMessage(`${PREFIX} Destination path cannot be empty.`);
+                    return;
+                }
+
+                const confirm = await vscode.window.showWarningMessage(
+                    `${PREFIX} Move ${moveMessage} to '${destPath}'?`,
+                    { modal: true },
+                    "Move"
+                );
+
+                if (confirm !== "Move") return;
+
+                const itemCount = targetPaths.length;
+
+                await withProgress(
+                    `Moving ${itemCount} item${itemCount > 1 ? "s" : ""} to ${path.basename(destPath)}...`,
+                    async (progress) => {
+                        
+                        // 1. Automatically create the destination folder if it doesn't exist
+                        progress.report({ message: `Preparing destination directory...` });
+                        try {
+                            await sudoExec(["mkdir", "-p", destPath]);
+                        } catch (err) {
+                            vscode.window.showErrorMessage(
+                                `${PREFIX} Failed to create destination directory: ${err.message}`
+                            );
+                            return;
+                        }
+
+                        // 2. Move the files
+                        progress.report({ message: `Moving files...` });
+                        await sudoMove(targetPaths, destPath, "root");
+
+                        progress.report({ message: `Completed!`, increment: 100 });
+                        vscode.window.showInformationMessage(
+                            `${PREFIX} Successfully moved ${moveMessage}`
+                        );
+
+                        // 3. Close editors if files were moved
+                        for (const editor of vscode.window.visibleTextEditors) {
+                            for (const targetPath of targetPaths) {
+                                if (editor.document.uri.fsPath === targetPath || 
+                                    editor.document.uri.fsPath.startsWith(targetPath + path.sep)) {
+                                    await vscode.window.showTextDocument(editor.document);
+                                    await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+                                }
+                            }
+                        }
+                    }
+                );
+            } catch (err) {
+                if (!(err instanceof vscode.CancellationError)) {
+                    vscode.window.showErrorMessage(`${PREFIX} ${err.message}`);
+                }
+            }
+        })
+    );
+
+    // Command 8: Delete File(s) or Folder(s)
     context.subscriptions.push(
         vscode.commands.registerCommand("remote-ssh-sudo.delete", async (uri, selectedUris) => {
             try {
@@ -706,7 +835,7 @@ exports.activate = (context) => {
         })
     );
 
-    // Command 8: Change Permissions (chmod)
+    // Command 9: Change Permissions (chmod)
     context.subscriptions.push(
         vscode.commands.registerCommand("remote-ssh-sudo.chmod", async (uri, selectedUris) => {
             try {
@@ -797,7 +926,7 @@ exports.activate = (context) => {
         })
     );
 
-    // Command 9: Change Owner/Group (chown)
+    // Command 10: Change Owner/Group (chown)
     context.subscriptions.push(
         vscode.commands.registerCommand("remote-ssh-sudo.chown", async (uri, selectedUris) => {
             try {
@@ -877,7 +1006,7 @@ exports.activate = (context) => {
         })
     );
 
-    // Command 10: Compress File(s) or Folder(s)
+    // Command 11: Compress File(s) or Folder(s)
     context.subscriptions.push(
         vscode.commands.registerCommand("remote-ssh-sudo.compress", async (uri, selectedUris) => {
             try {
@@ -989,7 +1118,7 @@ exports.activate = (context) => {
         })
     );
 
-    // Command 11: Extract Archive
+    // Command 12: Extract Archive
     context.subscriptions.push(
         vscode.commands.registerCommand("remote-ssh-sudo.extract", async (uri) => {
             try {

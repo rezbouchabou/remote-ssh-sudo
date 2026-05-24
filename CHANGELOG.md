@@ -1,3 +1,7 @@
+1.4.0
+- Added "Move as Root" with smart workspace path pre-filling and automatic destination folder creation
+- Cleaned up Command Palette titles for a more native VS Code experience
+
 1.3.0
 - Added real-time progress bars for long tasks (compressing, extracting, etc.)
 - Added default keyboard shortcut (Ctrl+Shift+Alt+S) for "Save as Root"
