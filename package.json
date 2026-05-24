@@ -1,8 +1,8 @@
 {
   "name": "remote-ssh-sudo",
   "displayName": "Sudo for Remote - SSH",
-  "description": "Add, edit, save, delete, and change permissions/ownership of protected files with sudo/root privileges.",
-  "version": "1.1.0",
+  "description": "Add, edit, save, delete, compress, extract, and change permissions/ownership of protected files with sudo/root privileges.",
+  "version": "1.2.0",
   "publisher": "rezbouchabou",
   "engines": {
     "vscode": "^1.80.0"
@@ -13,12 +13,14 @@
   ],
   "keywords": [
     "remote-ssh",
+    "remote",
     "ssh",
     "root",
     "sudo",
     "chmod",
     "chown",
-    "permissions"
+    "compress",
+    "extract"
   ],
   "repository": {
     "type": "git",
@@ -39,6 +41,13 @@
           "default": "sudo",
           "description": "The command to run sudo."
         },
+        "remote-ssh-sudo.timeoutSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 10,
+          "maximum": 300,
+          "description": "Timeout in seconds for sudo operations (10-300 seconds)."
+        },
         "remote-ssh-sudo.extensionsToNotifyOnSave": {
           "type": "array",
           "default": [],
@@ -50,12 +59,14 @@
       {
         "command": "remote-ssh-sudo.saveFile",
         "title": "Save as Root",
-        "category": "Sudo for Remote - SSH"
+        "category": "Sudo for Remote - SSH",
+        "icon": "$(save)"
       },
       {
         "command": "remote-ssh-sudo.saveFileAsSpecifiedUser",
         "title": "Save as Specified User...",
-        "category": "Sudo for Remote - SSH"
+        "category": "Sudo for Remote - SSH",
+        "icon": "$(save-as)"
       },
       {
         "command": "remote-ssh-sudo.newFile",
@@ -78,11 +89,6 @@
         "category": "Sudo for Remote - SSH"
       },
       {
-        "command": "remote-ssh-sudo.delete",
-        "title": "Delete as Root",
-        "category": "Sudo for Remote - SSH"
-      },
-      {
         "command": "remote-ssh-sudo.chmod",
         "title": "Change Permissions (chmod)...",
         "category": "Sudo for Remote - SSH"
@@ -91,9 +97,48 @@
         "command": "remote-ssh-sudo.chown",
         "title": "Change Owner/Group (chown)...",
         "category": "Sudo for Remote - SSH"
+      },
+      {
+        "command": "remote-ssh-sudo.compress",
+        "title": "Compress File or Folder (tar/zip)...",
+        "category": "Sudo for Remote - SSH"
+      },
+      {
+        "command": "remote-ssh-sudo.extract",
+        "title": "Extract Archive (tar/zip)...",
+        "category": "Sudo for Remote - SSH"
+      },
+      {
+        "command": "remote-ssh-sudo.delete",
+        "title": "Delete Permanently as Root",
+        "category": "Sudo for Remote - SSH"
       }
     ],
     "menus": {
+      "editor/title": [
+        {
+          "command": "remote-ssh-sudo.saveFile",
+          "group": "navigation@1",
+          "when": "resourceScheme == file"
+        },
+        {
+          "command": "remote-ssh-sudo.saveFileAsSpecifiedUser",
+          "group": "navigation@2",
+          "when": "resourceScheme == file"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "remote-ssh-sudo.saveFile",
+          "group": "1_modification@1",
+          "when": "resourceScheme == file"
+        },
+        {
+          "command": "remote-ssh-sudo.saveFileAsSpecifiedUser",
+          "group": "1_modification@2",
+          "when": "resourceScheme == file"
+        }
+      ],
       "explorer/context": [
         {
           "command": "remote-ssh-sudo.newFile",
@@ -116,16 +161,24 @@
           "group": "7_modification@4"
         },
         {
-          "command": "remote-ssh-sudo.delete",
+          "command": "remote-ssh-sudo.chmod",
           "group": "7_modification@5"
         },
         {
-          "command": "remote-ssh-sudo.chmod",
+          "command": "remote-ssh-sudo.chown",
           "group": "7_modification@6"
         },
         {
-          "command": "remote-ssh-sudo.chown",
+          "command": "remote-ssh-sudo.compress",
           "group": "7_modification@7"
+        },
+        {
+          "command": "remote-ssh-sudo.extract",
+          "group": "7_modification@8"
+        },
+        {
+          "command": "remote-ssh-sudo.delete",
+          "group": "7_modification@9"
         }
       ]
     }

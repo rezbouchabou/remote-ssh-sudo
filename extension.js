@@ -4,9 +4,21 @@ const os = require("os");
 const path = require("path");
 const fs = require("fs");
 
+/**
+ * Gets timeout value from configuration (default 60 seconds)
+ * @returns {number} timeout in milliseconds
+ */
+const getTimeout = () => {
+    const config = vscode.workspace.getConfiguration("remote-ssh-sudo");
+    const seconds = config.get("timeoutSeconds", 60);
+    return seconds * 1000;
+};
+
 /** @returns {Promise<void>} */
 const sudoWriteFile = async (/** @type {string} */filename, /** @type {string | Uint8Array} */content, /** @type {string} */user) => {
     const config = vscode.workspace.getConfiguration("remote-ssh-sudo");
+    const timeout = getTimeout();
+    
     return new Promise((resolve, reject) => {
         const p = execFile(config.get("command", "sudo"), [...(user === "root" ? [] : ["-u", user]), "-S", "-p", "password:", `filename=${filename}`, "sh", "-c", 'echo "file contents:" >&2; cat <&0 > "$filename"']);
         
@@ -14,7 +26,13 @@ const sudoWriteFile = async (/** @type {string} */filename, /** @type {string | 
         const cancel = (/** @type {Error} */err) => { if (!p.killed) { p.kill(); } stopTimer(); reject(err); };
 
         let timer = null;
-        const startTimer = () => { timer = setTimeout(() => { if (p.exitCode === null) { cancel(new Error(`Timeout: ${stderr}`)); } }, 60 * 1000); };
+        const startTimer = () => { 
+            timer = setTimeout(() => { 
+                if (p.exitCode === null) { 
+                    cancel(new Error(`Timeout writing file ${filename}: ${stderr || "(no error output)"}`)); 
+                } 
+            }, timeout); 
+        };
         const stopTimer = () => { if (timer !== null) { clearTimeout(timer); } timer = null; };
         startTimer();
 
@@ -23,34 +41,47 @@ const sudoWriteFile = async (/** @type {string} */filename, /** @type {string | 
             const lines = chunk.toString().split("\n").map((line) => line.trim());
             if (lines.includes("password:")) {
                 stopTimer();
-                vscode.window.showInputBox({ password: true, title: `Action as ${user}`, placeHolder: `password for ${os.userInfo().username}`, prompt: stderr !== "" ? `\n${stderr}` : "", ignoreFocusOut: true }).then((password) => {
+                vscode.window.showInputBox({ password: true, title: `Write File as ${user}`, placeHolder: `password for ${os.userInfo().username}`, prompt: stderr !== "" ? `\n${stderr}` : "", ignoreFocusOut: true }).then((password) => {
                     if (password === undefined) { return cancel(new vscode.CancellationError()); }
-                    startTimer(); p.stdin?.write(`${password}\n`);
+                    startTimer(); 
+                    p.stdin?.write(`${password}\n`);
                 }, cancel);
                 stderr = "";
             } else if (lines.includes("file contents:")) {
-                p.stdin?.write(content); p.stdin?.end();
+                p.stdin?.write(content);
+                p.stdin?.end();
                 stderr += lines.slice(lines.lastIndexOf("file contents:") + 1).join("\n");
             } else {
                 stderr += chunk.toString();
             }
         });
 
+        p.stderr?.on("error", (err) => { stopTimer(); reject(err); });
+        p.stdin?.on("error", (err) => { stopTimer(); reject(err); });
+
         p.on("exit", (code) => { stopTimer(); if (code === 0) { return resolve(); } else { reject(new Error(`exit code ${code}: ${stderr}`)); } });
     });
 };
 
 /** @returns {Promise<void>} */
-const sudoDelete = async (/** @type {string} */targetPath, /** @type {string} */user) => {
+const sudoDelete = async (/** @type {string[]} */targetPaths, /** @type {string} */user) => {
     const config = vscode.workspace.getConfiguration("remote-ssh-sudo");
+    const timeout = getTimeout();
+    
     return new Promise((resolve, reject) => {
-        const p = execFile(config.get("command", "sudo"), [...(user === "root" ? [] : ["-u", user]), "-S", "-p", "password:", "rm", "-rf", targetPath]);
+        const p = execFile(config.get("command", "sudo"), [...(user === "root" ? [] : ["-u", user]), "-S", "-p", "password:", "rm", "-rf", ...targetPaths]);
         
         p.on("error", (err) => { stopTimer(); reject(err); });
         const cancel = (/** @type {Error} */err) => { if (!p.killed) { p.kill(); } stopTimer(); reject(err); };
 
         let timer = null;
-        const startTimer = () => { timer = setTimeout(() => { if (p.exitCode === null) { cancel(new Error(`Timeout: ${stderr}`)); } }, 60 * 1000); };
+        const startTimer = () => { 
+            timer = setTimeout(() => { 
+                if (p.exitCode === null) { 
+                    cancel(new Error(`Timeout deleting items: ${stderr || "(no error output)"}`)); 
+                } 
+            }, timeout); 
+        };
         const stopTimer = () => { if (timer !== null) { clearTimeout(timer); } timer = null; };
         startTimer();
 
@@ -61,13 +92,18 @@ const sudoDelete = async (/** @type {string} */targetPath, /** @type {string} */
                 stopTimer();
                 vscode.window.showInputBox({ password: true, title: `Delete as ${user}`, placeHolder: `password for ${os.userInfo().username}`, prompt: stderr !== "" ? `\n${stderr}` : "", ignoreFocusOut: true }).then((password) => {
                     if (password === undefined) { return cancel(new vscode.CancellationError()); }
-                    startTimer(); p.stdin?.write(`${password}\n`); p.stdin?.end();
+                    startTimer(); 
+                    p.stdin?.write(`${password}\n`);
+                    p.stdin?.end();
                 }, cancel);
                 stderr = "";
             } else {
                 stderr += chunk.toString();
             }
         });
+
+        p.stderr?.on("error", (err) => { stopTimer(); reject(err); });
+        p.stdin?.on("error", (err) => { stopTimer(); reject(err); });
 
         p.on("exit", (code) => { stopTimer(); if (code === 0) { return resolve(); } else { reject(new Error(`exit code ${code}: ${stderr}`)); } });
     });
@@ -76,6 +112,8 @@ const sudoDelete = async (/** @type {string} */targetPath, /** @type {string} */
 /** @returns {Promise<void>} */
 const sudoCreateFolder = async (/** @type {string} */folderPath, /** @type {string} */user) => {
     const config = vscode.workspace.getConfiguration("remote-ssh-sudo");
+    const timeout = getTimeout();
+    
     return new Promise((resolve, reject) => {
         const p = execFile(config.get("command", "sudo"), [...(user === "root" ? [] : ["-u", user]), "-S", "-p", "password:", "mkdir", "-p", folderPath]);
         
@@ -83,7 +121,13 @@ const sudoCreateFolder = async (/** @type {string} */folderPath, /** @type {stri
         const cancel = (/** @type {Error} */err) => { if (!p.killed) { p.kill(); } stopTimer(); reject(err); };
 
         let timer = null;
-        const startTimer = () => { timer = setTimeout(() => { if (p.exitCode === null) { cancel(new Error(`Timeout: ${stderr}`)); } }, 60 * 1000); };
+        const startTimer = () => { 
+            timer = setTimeout(() => { 
+                if (p.exitCode === null) { 
+                    cancel(new Error(`Timeout creating folder ${folderPath}: ${stderr || "(no error output)"}`)); 
+                } 
+            }, timeout); 
+        };
         const stopTimer = () => { if (timer !== null) { clearTimeout(timer); } timer = null; };
         startTimer();
 
@@ -94,7 +138,9 @@ const sudoCreateFolder = async (/** @type {string} */folderPath, /** @type {stri
                 stopTimer();
                 vscode.window.showInputBox({ password: true, title: `Create Folder as ${user}`, placeHolder: `password for ${os.userInfo().username}`, prompt: stderr !== "" ? `\n${stderr}` : "", ignoreFocusOut: true }).then((password) => {
                     if (password === undefined) { return cancel(new vscode.CancellationError()); }
-                    startTimer(); p.stdin?.write(`${password}\n`); p.stdin?.end();
+                    startTimer(); 
+                    p.stdin?.write(`${password}\n`);
+                    p.stdin?.end();
                 }, cancel);
                 stderr = "";
             } else {
@@ -102,16 +148,21 @@ const sudoCreateFolder = async (/** @type {string} */folderPath, /** @type {stri
             }
         });
 
+        p.stderr?.on("error", (err) => { stopTimer(); reject(err); });
+        p.stdin?.on("error", (err) => { stopTimer(); reject(err); });
+
         p.on("exit", (code) => { stopTimer(); if (code === 0) { return resolve(); } else { reject(new Error(`exit code ${code}: ${stderr}`)); } });
     });
 };
 
 /** 
- * Generic function to execute any sudo command (like chmod or chown) 
+ * Generic function to execute any sudo command
  * @returns {Promise<void>} 
  */
 const sudoExec = async (/** @type {string[]} */args) => {
     const config = vscode.workspace.getConfiguration("remote-ssh-sudo");
+    const timeout = getTimeout();
+    
     return new Promise((resolve, reject) => {
         const p = execFile(config.get("command", "sudo"), ["-S", "-p", "password:", ...args]);
         
@@ -119,7 +170,13 @@ const sudoExec = async (/** @type {string[]} */args) => {
         const cancel = (/** @type {Error} */err) => { if (!p.killed) { p.kill(); } stopTimer(); reject(err); };
 
         let timer = null;
-        const startTimer = () => { timer = setTimeout(() => { if (p.exitCode === null) { cancel(new Error(`Timeout: ${stderr}`)); } }, 60 * 1000); };
+        const startTimer = () => { 
+            timer = setTimeout(() => { 
+                if (p.exitCode === null) { 
+                    cancel(new Error(`Timeout executing sudo command '${args[0]}': ${stderr || "(no error output)"}`)); 
+                } 
+            }, timeout); 
+        };
         const stopTimer = () => { if (timer !== null) { clearTimeout(timer); } timer = null; };
         startTimer();
 
@@ -130,13 +187,18 @@ const sudoExec = async (/** @type {string[]} */args) => {
                 stopTimer();
                 vscode.window.showInputBox({ password: true, title: `Sudo Authentication`, placeHolder: `password for ${os.userInfo().username}`, prompt: stderr !== "" ? `\n${stderr}` : "", ignoreFocusOut: true }).then((password) => {
                     if (password === undefined) { return cancel(new vscode.CancellationError()); }
-                    startTimer(); p.stdin?.write(`${password}\n`); p.stdin?.end();
+                    startTimer(); 
+                    p.stdin?.write(`${password}\n`);
+                    p.stdin?.end();
                 }, cancel);
                 stderr = "";
             } else {
                 stderr += chunk.toString();
             }
         });
+
+        p.stderr?.on("error", (err) => { stopTimer(); reject(err); });
+        p.stdin?.on("error", (err) => { stopTimer(); reject(err); });
 
         p.on("exit", (code) => { stopTimer(); if (code === 0) { return resolve(); } else { reject(new Error(`exit code ${code}: ${stderr}`)); } });
     });
@@ -150,10 +212,29 @@ const getTargetPath = async (uri) => {
         uri = vscode.window.activeTextEditor.document.uri;
     }
     if (uri === undefined || uri.scheme !== "file") {
-        await vscode.window.showErrorMessage("[Sudo for Remote - SSH] No local file or folder selected.");
+        await vscode.window.showErrorMessage("No local file or folder selected.");
         return null;
     }
     return uri.fsPath;
+};
+
+/**
+ * Validates chmod mode format
+ */
+const validateChmodMode = (mode) => {
+    // Match octal (0755) or symbolic (u+x) formats
+    const octalPattern = /^[0-7]{3,4}$/;
+    const symbolicPattern = /^[ugo]*[+\-=][rwxXst]+([,][ugo]*[+\-=][rwxXst]+)*$/;
+    return octalPattern.test(mode) || symbolicPattern.test(mode);
+};
+
+/**
+ * Validates chown owner:group format
+ */
+const validateOwnerFormat = (owner) => {
+    // Allow formats: user, user:group, UID, UID:GID
+    const pattern = /^[a-zA-Z0-9._-]+$|^[a-zA-Z0-9._-]+:[a-zA-Z0-9._-]+$|^\d+$|^\d+:\d+$/;
+    return pattern.test(owner);
 };
 
 const notifyToOtherExtensions = async (/** @type {"willSave" | "didSave"} */eventName, /** @type {vscode.TextDocument} */document) => {
@@ -183,7 +264,7 @@ const handleNewFile = async (uri, user) => {
         uri = vscode.workspace.workspaceFolders[0].uri;
     }
     if (uri === undefined) { uri = vscode.Uri.parse(os.homedir()); }
-    if (uri.scheme !== "file") { await vscode.window.showErrorMessage(`[Sudo for Remote - SSH] Unsupported uri scheme: ${uri.scheme}`); return; }
+    if (uri.scheme !== "file") { await vscode.window.showErrorMessage(`Unsupported uri scheme: ${uri.scheme}`); return; }
 
     const pathValue = uri.fsPath + path.sep;
     const filepath = await vscode.window.showInputBox({ value: pathValue, valueSelection: [pathValue.length, pathValue.length], prompt: `Enter file path to create as ${user}` });
@@ -193,7 +274,7 @@ const handleNewFile = async (uri, user) => {
     const emptyString = encodingOptions === undefined ? await vscode.workspace.encode("") : await vscode.workspace.encode("", encodingOptions);
     await sudoWriteFile(filepath, emptyString, user);
     await vscode.commands.executeCommand("vscode.open", uri);
-    vscode.window.showInformationMessage(`[Sudo for Remote - SSH] Successfully added file: ${filepath}`);
+    vscode.window.showInformationMessage(`Successfully added file: ${filepath}`);
 };
 
 const handleNewFolder = async (uri, user) => {
@@ -204,20 +285,22 @@ const handleNewFolder = async (uri, user) => {
         uri = vscode.workspace.workspaceFolders[0].uri;
     }
     if (uri === undefined) { uri = vscode.Uri.parse(os.homedir()); }
-    if (uri.scheme !== "file") { await vscode.window.showErrorMessage(`[Sudo for Remote - SSH] Unsupported uri scheme: ${uri.scheme}`); return; }
+    if (uri.scheme !== "file") { await vscode.window.showErrorMessage(`Unsupported uri scheme: ${uri.scheme}`); return; }
 
     const pathValue = uri.fsPath + path.sep;
     const folderpath = await vscode.window.showInputBox({ value: pathValue, valueSelection: [pathValue.length, pathValue.length], prompt: `Enter folder path to create as ${user}` });
     if (!folderpath) return;
     
     await sudoCreateFolder(folderpath, user);
-    vscode.window.showInformationMessage(`[Sudo for Remote - SSH] Successfully added folder: ${folderpath}`);
+    vscode.window.showInformationMessage(`Successfully added folder: ${folderpath}`);
 };
 
 exports.activate = (/** @type {vscode.ExtensionContext} */context) => {
     
     // Command 1: Save as Root
-    context.subscriptions.push(vscode.commands.registerCommand("remote-ssh-sudo.saveFile", async (/** @type {string | undefined} */user = "root") => {
+    context.subscriptions.push(vscode.commands.registerCommand("remote-ssh-sudo.saveFile", async (arg) => {
+        const user = (typeof arg === "string") ? arg : "root";
+        
         const editor = vscode.window.activeTextEditor;
         if (editor === undefined) return;
         
@@ -229,7 +312,8 @@ exports.activate = (/** @type {vscode.ExtensionContext} */context) => {
         try {
             if (!editor.document.isUntitled) {  
                 await notifyToOtherExtensions("willSave", editor.document);
-                await sudoWriteFile(editor.document.fileName, await vscode.workspace.encode(editor.document.getText(), { encoding: editor.document.encoding }), user);
+                const fileContent = await vscode.workspace.encode(editor.document.getText(), { encoding: editor.document.encoding });
+                await sudoWriteFile(editor.document.fileName, fileContent, user);
                 if (vscode.window.activeTextEditor !== editor) {
                     await vscode.window.showTextDocument(editor.document, editor.viewColumn);
                 }
@@ -245,25 +329,23 @@ exports.activate = (/** @type {vscode.ExtensionContext} */context) => {
                     filename = input.fsPath;
                 }
 
-                await sudoWriteFile(filename, "", user);
-                const newDocument = await vscode.workspace.openTextDocument(filename, { encoding: editor.document.encoding });
-                await notifyToOtherExtensions("willSave", newDocument);
-                await sudoWriteFile(filename, await vscode.workspace.encode(editor.document.getText(), { encoding: editor.document.encoding }), user);
-                const column = editor.viewColumn;
+                const fileContent = await vscode.workspace.encode(editor.document.getText(), { encoding: editor.document.encoding });
+                await sudoWriteFile(filename, fileContent, user);
+                
+                const newDocument = await vscode.workspace.openTextDocument(filename);
+                await notifyToOtherExtensions("didSave", newDocument);
 
                 if (vscode.window.activeTextEditor !== editor) {
                     await vscode.window.showTextDocument(editor.document, editor.viewColumn);
                 }
 
                 await vscode.commands.executeCommand("workbench.action.revertAndCloseActiveEditor");
-                await vscode.window.showTextDocument(newDocument, column);
-                await vscode.commands.executeCommand("workbench.action.files.revert");
-                await notifyToOtherExtensions("didSave", newDocument);
+                await vscode.window.showTextDocument(newDocument, editor.viewColumn);
             }
-            vscode.window.showInformationMessage(`[Sudo for Remote - SSH] Successfully saved`);
+            vscode.window.showInformationMessage(`Successfully saved`);
         } catch (err) {
             if (err instanceof vscode.CancellationError) return;
-            vscode.window.showErrorMessage(`[Sudo for Remote - SSH] ${err.message}`);
+            vscode.window.showErrorMessage(`${err.message}`);
         }
     }));
 
@@ -271,13 +353,13 @@ exports.activate = (/** @type {vscode.ExtensionContext} */context) => {
     let lastUser = "";
     context.subscriptions.push(vscode.commands.registerCommand("remote-ssh-sudo.saveFileAsSpecifiedUser", async () => {
         const user = lastUser = await vscode.window.showInputBox({ value: lastUser, placeHolder: "username", ignoreFocusOut: true }) || "";
-        if (!user) { await vscode.window.showInformationMessage("[Sudo for Remote - SSH] Canceled!"); return; }
+        if (!user) { await vscode.window.showInformationMessage("Canceled!"); return; }
         vscode.commands.executeCommand("remote-ssh-sudo.saveFile", user);
     }));
 
     // Command 3: New File as Root
     context.subscriptions.push(vscode.commands.registerCommand("remote-ssh-sudo.newFile", async (uri) => {
-        try { await handleNewFile(uri, "root"); } catch (err) { vscode.window.showErrorMessage(`[Sudo for Remote - SSH] ${err.message}`); }
+        try { await handleNewFile(uri, "root"); } catch (err) { vscode.window.showErrorMessage(`${err.message}`); }
     }));
 
     // Command 4: New File as Specified User
@@ -286,12 +368,12 @@ exports.activate = (/** @type {vscode.ExtensionContext} */context) => {
             const user = lastUser = await vscode.window.showInputBox({ value: lastUser, placeHolder: "username", ignoreFocusOut: true }) || "";
             if (!user) return;
             await handleNewFile(uri, user);
-        } catch (err) { vscode.window.showErrorMessage(`[Sudo for Remote - SSH] ${err.message}`); }
+        } catch (err) { vscode.window.showErrorMessage(`${err.message}`); }
     }));
 
     // Command 5: New Folder as Root
     context.subscriptions.push(vscode.commands.registerCommand("remote-ssh-sudo.newFolder", async (uri) => {
-        try { await handleNewFolder(uri, "root"); } catch (err) { vscode.window.showErrorMessage(`[Sudo for Remote - SSH] ${err.message}`); }
+        try { await handleNewFolder(uri, "root"); } catch (err) { vscode.window.showErrorMessage(`${err.message}`); }
     }));
 
     // Command 6: New Folder as Specified User
@@ -300,34 +382,60 @@ exports.activate = (/** @type {vscode.ExtensionContext} */context) => {
             const user = lastUser = await vscode.window.showInputBox({ value: lastUser, placeHolder: "username", ignoreFocusOut: true }) || "";
             if (!user) return;
             await handleNewFolder(uri, user);
-        } catch (err) { vscode.window.showErrorMessage(`[Sudo for Remote - SSH] ${err.message}`); }
+        } catch (err) { vscode.window.showErrorMessage(`${err.message}`); }
     }));
 
-    // Command 7: Delete File or Folder as Root
-    context.subscriptions.push(vscode.commands.registerCommand("remote-ssh-sudo.delete", async (/** @type {vscode.Uri | undefined} */uri) => {
+    // Command 7: Delete File(s) or Folder(s) as Root
+    context.subscriptions.push(vscode.commands.registerCommand("remote-ssh-sudo.delete", async (uri, selectedUris) => {
         try {
-            if (uri === undefined && vscode.window.activeTextEditor !== undefined) { uri = vscode.window.activeTextEditor.document.uri; }
-            if (uri === undefined || uri.scheme !== "file") {
-                await vscode.window.showErrorMessage("[Sudo for Remote - SSH] No file or folder selected to delete."); return;
+            let urisToDelete = [];
+            
+            if (selectedUris && Array.isArray(selectedUris) && selectedUris.length > 0) {
+                urisToDelete = selectedUris;
+            } 
+            else if (uri) {
+                urisToDelete = [uri];
+            } 
+            else if (vscode.window.activeTextEditor !== undefined) {
+                urisToDelete = [vscode.window.activeTextEditor.document.uri];
             }
 
-            const targetPath = uri.fsPath;
-            const confirm = await vscode.window.showWarningMessage(`[Sudo for Remote - SSH] Are you sure you want to permanently delete '${targetPath}' as root?`, { modal: true }, "Delete");
+            urisToDelete = urisToDelete.filter(u => u.scheme === "file");
+
+            if (urisToDelete.length === 0) {
+                await vscode.window.showErrorMessage("No file or folder selected to delete."); 
+                return;
+            }
+
+            const targetPaths = urisToDelete.map(u => u.fsPath);
+            
+            const deleteMessage = targetPaths.length === 1 
+                ? `'${targetPaths[0]}'` 
+                : `${targetPaths.length} selected items`;
+
+            const confirm = await vscode.window.showWarningMessage(
+                `Are you sure you want to permanently delete ${deleteMessage} as root?`, 
+                { modal: true }, 
+                "Delete"
+            );
+            
             if (confirm !== "Delete") return; 
 
-            await sudoDelete(targetPath, "root");
+            await sudoDelete(targetPaths, "root");
 
             for (const editor of vscode.window.visibleTextEditors) {
-                if (editor.document.uri.fsPath === targetPath || editor.document.uri.fsPath.startsWith(targetPath + path.sep)) {
-                    await vscode.window.showTextDocument(editor.document);
-                    await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+                for (const targetPath of targetPaths) {
+                    if (editor.document.uri.fsPath === targetPath || editor.document.uri.fsPath.startsWith(targetPath + path.sep)) {
+                        await vscode.window.showTextDocument(editor.document);
+                        await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+                    }
                 }
             }
 
-            vscode.window.showInformationMessage(`[Sudo for Remote - SSH] Successfully deleted: ${targetPath}`);
+            vscode.window.showInformationMessage(`Successfully deleted ${deleteMessage}`);
         } catch (err) {
             if (err instanceof vscode.CancellationError) return;
-            vscode.window.showErrorMessage(`[Sudo for Remote - SSH] ${err.message}`);
+            vscode.window.showErrorMessage(`${err.message}`);
         }
     }));
 
@@ -337,15 +445,27 @@ exports.activate = (/** @type {vscode.ExtensionContext} */context) => {
             const targetPath = await getTargetPath(uri);
             if (!targetPath) return;
 
+            try {
+                await fs.promises.stat(targetPath);
+            } catch (err) {
+                vscode.window.showErrorMessage(`Path not found: ${targetPath}`);
+                return;
+            }
+
             const stats = await fs.promises.stat(targetPath);
             const isDir = stats.isDirectory();
 
             const mode = await vscode.window.showInputBox({ 
-                prompt: `Enter permissions for '${targetPath}'`, 
-                placeHolder: "e.g., 0775, 644, 777",
+                prompt: `Enter permissions for '${path.basename(targetPath)}'`, 
+                placeHolder: "e.g., 0775, 644, 777, or u+x",
                 ignoreFocusOut: true
             });
             if (!mode) return;
+
+            if (!validateChmodMode(mode)) {
+                vscode.window.showErrorMessage(`Invalid permission format. Use octal (e.g., 0755) or symbolic (e.g., u+x)`);
+                return;
+            }
 
             let recursive = false;
             if (isDir) {
@@ -362,11 +482,11 @@ exports.activate = (/** @type {vscode.ExtensionContext} */context) => {
             args.push(mode, targetPath);
 
             await sudoExec(args);
-            vscode.window.showInformationMessage(`[Sudo for Remote - SSH] Successfully set permissions to ${mode}`);
+            vscode.window.showInformationMessage(`Successfully set permissions to ${mode}`);
 
         } catch (err) {
             if (err instanceof vscode.CancellationError) return;
-            vscode.window.showErrorMessage(`[Sudo for Remote - SSH] ${err.message}`);
+            vscode.window.showErrorMessage(`${err.message}`);
         }
     }));
 
@@ -376,15 +496,27 @@ exports.activate = (/** @type {vscode.ExtensionContext} */context) => {
             const targetPath = await getTargetPath(uri);
             if (!targetPath) return;
 
+            try {
+                await fs.promises.stat(targetPath);
+            } catch (err) {
+                vscode.window.showErrorMessage(`Path not found: ${targetPath}`);
+                return;
+            }
+
             const stats = await fs.promises.stat(targetPath);
             const isDir = stats.isDirectory();
 
             const owner = await vscode.window.showInputBox({ 
-                prompt: `Enter owner:group for '${targetPath}'`, 
+                prompt: `Enter owner:group for '${path.basename(targetPath)}'`, 
                 placeHolder: "e.g., www-data:www-data, ubuntu:ubuntu, 82:82",
                 ignoreFocusOut: true
             });
             if (!owner) return;
+
+            if (!validateOwnerFormat(owner)) {
+                vscode.window.showErrorMessage(`Invalid owner format. Use 'user' or 'user:group' or numeric IDs`);
+                return;
+            }
 
             let recursive = false;
             if (isDir) {
@@ -401,11 +533,81 @@ exports.activate = (/** @type {vscode.ExtensionContext} */context) => {
             args.push(owner, targetPath);
 
             await sudoExec(args);
-            vscode.window.showInformationMessage(`[Sudo for Remote - SSH] Successfully changed owner to ${owner}`);
+            vscode.window.showInformationMessage(`Successfully changed owner to ${owner}`);
 
         } catch (err) {
             if (err instanceof vscode.CancellationError) return;
-            vscode.window.showErrorMessage(`[Sudo for Remote - SSH] ${err.message}`);
+            vscode.window.showErrorMessage(`${err.message}`);
+        }
+    }));
+
+    // Command 10: Compress File or Folder
+    context.subscriptions.push(vscode.commands.registerCommand("remote-ssh-sudo.compress", async (uri) => {
+        try {
+            const targetPath = await getTargetPath(uri);
+            if (!targetPath) return;
+
+            const defaultArchive = targetPath + ".tar.gz";
+            const archivePath = await vscode.window.showInputBox({
+                prompt: `Enter destination archive path (.tar.gz or .zip)`,
+                value: defaultArchive,
+                ignoreFocusOut: true
+            });
+            if (!archivePath) return;
+
+            const parentDir = path.dirname(targetPath);
+            const baseName = path.basename(targetPath);
+
+            let args = [];
+            if (archivePath.endsWith(".zip")) {
+                args = ["sh", "-c", 'cd "$0" && zip -r "$1" "$2"', parentDir, archivePath, baseName];
+            } else {
+                args = ["tar", "-C", parentDir, "-czf", archivePath, baseName];
+            }
+
+            await sudoExec(args);
+            vscode.window.showInformationMessage(`Successfully compressed to ${path.basename(archivePath)}`);
+
+        } catch (err) {
+            if (err instanceof vscode.CancellationError) return;
+            vscode.window.showErrorMessage(`${err.message}`);
+        }
+    }));
+
+    // Command 11: Extract Archive
+    context.subscriptions.push(vscode.commands.registerCommand("remote-ssh-sudo.extract", async (uri) => {
+        try {
+            const targetPath = await getTargetPath(uri);
+            if (!targetPath) return;
+
+            const defaultDest = path.dirname(targetPath);
+            const destPath = await vscode.window.showInputBox({
+                prompt: `Enter destination directory for extraction`,
+                value: defaultDest,
+                ignoreFocusOut: true
+            });
+            if (!destPath) return;
+
+            try {
+                await sudoExec(["mkdir", "-p", destPath]);
+            } catch (err) {
+                vscode.window.showErrorMessage(`Failed to create destination directory: ${err.message}`);
+                return;
+            }
+
+            let args = [];
+            if (targetPath.endsWith(".zip")) {
+                args = ["unzip", targetPath, "-d", destPath];
+            } else {
+                args = ["tar", "-xzf", targetPath, "-C", destPath];
+            }
+
+            await sudoExec(args);
+            vscode.window.showInformationMessage(`Successfully extracted archive`);
+
+        } catch (err) {
+            if (err instanceof vscode.CancellationError) return;
+            vscode.window.showErrorMessage(`${err.message}`);
         }
     }));
 };
