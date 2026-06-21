@@ -2,7 +2,7 @@
   "name": "remote-ssh-sudo",
   "displayName": "Sudo for Remote - SSH",
   "description": "Add, edit, save, delete, move, compress, extract, and change permissions/ownership of protected files with sudo/root privileges.",
-  "version": "1.4.0",
+  "version": "2.0.0",
   "publisher": "rezbouchabou",
   "license": "MIT",
   "engines": {
@@ -24,6 +24,7 @@
     "compress",
     "extract",
     "permissions",
+    "ownership",
     "file-management"
   ],
   "repository": {
@@ -70,8 +71,8 @@
         "icon": "$(save)"
       },
       {
-        "command": "remote-ssh-sudo.saveFileAsSpecifiedUser",
-        "title": "Save as Specified User...",
+        "command": "remote-ssh-sudo.saveFileAsUser",
+        "title": "Save as User...",
         "category": "Sudo for Remote - SSH",
         "icon": "$(save-as)"
       },
@@ -81,8 +82,8 @@
         "category": "Sudo for Remote - SSH"
       },
       {
-        "command": "remote-ssh-sudo.newFileAsSpecifiedUser",
-        "title": "New File as Specified User...",
+        "command": "remote-ssh-sudo.newFileAsUser",
+        "title": "New File as User...",
         "category": "Sudo for Remote - SSH"
       },
       {
@@ -91,8 +92,8 @@
         "category": "Sudo for Remote - SSH"
       },
       {
-        "command": "remote-ssh-sudo.newFolderAsSpecifiedUser",
-        "title": "New Folder as Specified User...",
+        "command": "remote-ssh-sudo.newFolderAsUser",
+        "title": "New Folder as User...",
         "category": "Sudo for Remote - SSH"
       },
       {
@@ -102,7 +103,7 @@
       },
       {
         "command": "remote-ssh-sudo.chown",
-        "title": "Change Owner/Group...",
+        "title": "Change Ownership...",
         "category": "Sudo for Remote - SSH"
       },
       {
@@ -143,7 +144,7 @@
           "icon": "$(save)"
         },
         {
-          "command": "remote-ssh-sudo.saveFileAsSpecifiedUser",
+          "command": "remote-ssh-sudo.saveFileAsUser",
           "group": "navigation@2",
           "when": "resourceScheme == file",
           "icon": "$(save-as)"
@@ -157,7 +158,7 @@
           "icon": "$(save)"
         },
         {
-          "command": "remote-ssh-sudo.saveFileAsSpecifiedUser",
+          "command": "remote-ssh-sudo.saveFileAsUser",
           "group": "1_modification@2",
           "when": "resourceScheme == file",
           "icon": "$(save-as)"
@@ -175,12 +176,12 @@
           "group": "7_modification@2"
         },
         {
-          "command": "remote-ssh-sudo.newFileAsSpecifiedUser",
+          "command": "remote-ssh-sudo.newFileAsUser",
           "when": "explorerResourceIsFolder",
           "group": "7_modification@3"
         },
         {
-          "command": "remote-ssh-sudo.newFolderAsSpecifiedUser",
+          "command": "remote-ssh-sudo.newFolderAsUser",
           "when": "explorerResourceIsFolder",
           "group": "7_modification@4"
         },

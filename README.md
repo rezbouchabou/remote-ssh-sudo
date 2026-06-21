@@ -10,16 +10,16 @@ If you frequently work on remote Linux servers and need to edit system configura
 
 This extension adds several commands to VS Code, allowing you to bypass permission denied errors seamlessly:
 
-* **Save as Root / Specified User:** Save the currently open protected file using `sudo`. Icons appear in the **Editor Actions Title bar** for quick access! (Default Hotkey: `Ctrl+Shift+Alt+S`)
+* **Save as Root / User:** Save the currently open protected file using `sudo`. Icons appear in the **Editor Actions Title bar** for quick access! (Default Hotkey: `Ctrl+Shift+Alt+S`)
 
 ![Screenshot](https://raw.githubusercontent.com/rezbouchabou/remote-ssh-sudo/main/images/editor.png)
 
 * **Multi-Selection Support:** Apply actions (Delete, Compress, Chmod, Chown, Move) to dozens of files and folders at the exact same time.
 * **Move as Root:** Move protected files or directories with smart path prediction and automatic destination folder creation.
-* **New File / Folder as Root / Specified User:** Create new files or nested directories anywhere on the remote file system.
+* **New File / Folder as Root / User:** Create new files or nested directories anywhere on the remote file system.
 * **Delete as Root:** Permanently delete protected files or directories (runs `rm -rf`). 
 * **Change Permissions (chmod):** Quickly apply new numeric or symbolic permissions to any file or folder.
-* **Change Owner/Group (chown):** Easily reassign the user and group ownership of a file or folder.
+* **Change Ownership (chown):** Easily reassign the user and group ownership of a file or folder.
 * **Compress & Extract:** Instantly zip/unzip or tar/untar files directly from the context menu with visual progress bars.
 * **Recursive Operations:** Automatically detects if you are modifying a folder's permissions or ownership and interactively asks if you want to apply the changes recursively (`-R`).
 
