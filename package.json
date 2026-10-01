@@ -2,7 +2,7 @@
   "name": "remote-ssh-sudo",
   "displayName": "Sudo for Remote - SSH",
   "description": "Add, edit, save, delete, move, compress, extract, and change permissions/ownership of protected files with sudo/root privileges.",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "publisher": "rezbouchabou",
   "license": "MIT",
   "engines": {

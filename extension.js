@@ -153,7 +153,7 @@ const sudoWriteFile = async (filename, content, user) => {
                 }).then((password) => {
                     if (password === undefined) return cancel(new vscode.CancellationError());
                     startTimer();
-                    passwordRequested = false; // FIX: Allow re-prompt if password is wrong
+                    passwordRequested = false;
                     if (p.stdin?.writable) p.stdin.write(`${password}\n`);
                 });
             } else if (stderrBuffer.includes("file contents:")) {
@@ -203,7 +203,19 @@ const getTargetPath = async (uri, allowMultiple = false) => {
 
 const validateChmodMode = (mode) => /^[0-7]{3,4}$/.test(mode) || /^[ugo]*[+\-=][rwxXst]+([,][ugo]*[+\-=][rwxXst]+)*$/.test(mode);
 const validateOwnerFormat = (owner) => /^[a-zA-Z0-9._-]+$|^[a-zA-Z0-9._-]+:[a-zA-Z0-9._-]+$|^\d+$|^\d+:\d+$/.test(owner);
-const validateArchiveFormat = (archivePath) => archivePath.endsWith(".tar.gz") || archivePath.endsWith(".tgz") || archivePath.endsWith(".zip");
+
+const validateArchiveFormat = (archivePath) => {
+    const lower = archivePath.toLowerCase();
+    return [
+        ".zip", ".7z", ".rar", ".tar", 
+        ".gz", ".tgz", ".tar.gz", 
+        ".bz2", ".tbz2", ".tar.bz2", 
+        ".xz", ".txz", ".tar.xz",
+        ".zst", ".tzst", ".tar.zst",
+        ".lzma", ".tar.lzma"
+    ].some(ext => lower.endsWith(ext));
+};
+
 const pathExists = async (filePath) => fs.promises.stat(filePath).then(() => true).catch(() => false);
 
 const notifyToOtherExtensions = async (eventName, document) => {
@@ -450,18 +462,51 @@ exports.activate = (context) => {
             const archivePath = await vscode.window.showInputBox({ prompt: "Archive destination", value: defaultArchive });
             
             if (!archivePath) return;
-            if (!validateArchiveFormat(archivePath)) throw new Error("Invalid format. Use .tar.gz, .tgz, or .zip");
+            if (!validateArchiveFormat(archivePath)) throw new Error("Invalid format. Use .zip, .7z, .rar, .tar, .gz, .bz2, .xz, .zst, etc.");
 
             await withProgress("Compressing...", async () => {
                 const parentDir = path.dirname(targetPaths[0]);
                 const baseNames = targetPaths.map(p => path.basename(p));
+                const lowerPath = archivePath.toLowerCase();
 
                 let args = [];
-                if (archivePath.endsWith(".zip")) {
+                if (lowerPath.endsWith(".zip")) {
                     args = ["sh", "-c", 'cd "$1" && shift && zip -r "$0" "$@"', archivePath, parentDir, ...baseNames];
-                } else {
+                } else if (lowerPath.endsWith(".7z")) {
+                    args = ["sh", "-c", 'cd "$1" && shift && 7z a "$0" "$@"', archivePath, parentDir, ...baseNames];
+                } else if (lowerPath.endsWith(".rar")) {
+                    args = ["sh", "-c", 'cd "$1" && shift && rar a "$0" "$@"', archivePath, parentDir, ...baseNames];
+                } else if (lowerPath.endsWith(".tar")) {
+                    args = ["tar", "-C", parentDir, "-cf", archivePath, ...baseNames];
+                } else if (lowerPath.endsWith(".tar.gz") || lowerPath.endsWith(".tgz")) {
                     args = ["tar", "-C", parentDir, "-czf", archivePath, ...baseNames];
+                } else if (lowerPath.endsWith(".tar.bz2") || lowerPath.endsWith(".tbz2")) {
+                    args = ["tar", "-C", parentDir, "-cjf", archivePath, ...baseNames];
+                } else if (lowerPath.endsWith(".tar.xz") || lowerPath.endsWith(".txz")) {
+                    args = ["tar", "-C", parentDir, "-cJf", archivePath, ...baseNames];
+                } else if (lowerPath.endsWith(".tar.zst") || lowerPath.endsWith(".tzst")) {
+                    args = ["tar", "-C", parentDir, "--zstd", "-cf", archivePath, ...baseNames];
+                } else if (lowerPath.endsWith(".tar.lzma")) {
+                    args = ["tar", "-C", parentDir, "--lzma", "-cf", archivePath, ...baseNames];
+                } else if (lowerPath.endsWith(".gz")) {
+                    if (targetPaths.length > 1) throw new Error("GZIP (.gz) only supports compressing a single file. Use .tar.gz for multiple files.");
+                    args = ["sh", "-c", 'gzip -c "$1" > "$0"', archivePath, ...targetPaths];
+                } else if (lowerPath.endsWith(".bz2")) {
+                    if (targetPaths.length > 1) throw new Error("BZIP2 (.bz2) only supports compressing a single file. Use .tar.bz2 for multiple files.");
+                    args = ["sh", "-c", 'bzip2 -c "$1" > "$0"', archivePath, ...targetPaths];
+                } else if (lowerPath.endsWith(".xz")) {
+                    if (targetPaths.length > 1) throw new Error("XZ (.xz) only supports compressing a single file. Use .tar.xz for multiple files.");
+                    args = ["sh", "-c", 'xz -c "$1" > "$0"', archivePath, ...targetPaths];
+                } else if (lowerPath.endsWith(".zst")) {
+                    if (targetPaths.length > 1) throw new Error("ZSTD (.zst) only supports compressing a single file. Use .tar.zst for multiple files.");
+                    args = ["sh", "-c", 'zstd -c "$1" > "$0"', archivePath, ...targetPaths];
+                } else if (lowerPath.endsWith(".lzma")) {
+                    if (targetPaths.length > 1) throw new Error("LZMA (.lzma) only supports compressing a single file. Use .tar.lzma for multiple files.");
+                    args = ["sh", "-c", 'lzma -c "$1" > "$0"', archivePath, ...targetPaths];
+                } else {
+                    throw new Error("Unsupported archive format.");
                 }
+
                 await sudoExec(args);
             });
 
@@ -469,7 +514,7 @@ exports.activate = (context) => {
         } catch (err) {
             if (!(err instanceof vscode.CancellationError)) {
                 log(`Compress failed: ${err.message}`, "ERROR");
-                vscode.window.showErrorMessage(`Failed`);
+                vscode.window.showErrorMessage(`Failed: ${err.message}`);
             }
         }
     }));
@@ -485,7 +530,42 @@ exports.activate = (context) => {
 
             await withProgress("Extracting...", async () => {
                 await sudoExec(["mkdir", "-p", destPath]);
-                const args = targetPath.endsWith(".zip") ? ["unzip", "-o", targetPath, "-d", destPath] : ["tar", "-xzf", targetPath, "-C", destPath];
+                
+                const lowerPath = targetPath.toLowerCase();
+                let args = [];
+
+                if (lowerPath.endsWith(".zip")) {
+                    args = ["sh", "-c", 'unzip -o "$0" -d "$1"', targetPath, destPath];
+                } else if (lowerPath.endsWith(".7z")) {
+                    args = ["sh", "-c", '7z x "$0" -o"$1" -y', targetPath, destPath];
+                } else if (lowerPath.endsWith(".rar")) {
+                    args = ["sh", "-c", 'unrar x -o+ "$0" "$1/"', targetPath, destPath];
+                } else if (lowerPath.endsWith(".tar")) {
+                    args = ["tar", "-xf", targetPath, "-C", destPath];
+                } else if (lowerPath.endsWith(".tar.gz") || lowerPath.endsWith(".tgz")) {
+                    args = ["tar", "-xzf", targetPath, "-C", destPath];
+                } else if (lowerPath.endsWith(".tar.bz2") || lowerPath.endsWith(".tbz2")) {
+                    args = ["tar", "-xjf", targetPath, "-C", destPath];
+                } else if (lowerPath.endsWith(".tar.xz") || lowerPath.endsWith(".txz")) {
+                    args = ["tar", "-xJf", targetPath, "-C", destPath];
+                } else if (lowerPath.endsWith(".tar.zst") || lowerPath.endsWith(".tzst")) {
+                    args = ["tar", "--zstd", "-xf", targetPath, "-C", destPath];
+                } else if (lowerPath.endsWith(".tar.lzma")) {
+                    args = ["tar", "--lzma", "-xf", targetPath, "-C", destPath];
+                } else if (lowerPath.endsWith(".gz")) {
+                    args = ["sh", "-c", 'gzip -dc "$0" > "$1"', targetPath, path.join(destPath, path.basename(targetPath, ".gz"))];
+                } else if (lowerPath.endsWith(".bz2")) {
+                    args = ["sh", "-c", 'bzip2 -dc "$0" > "$1"', targetPath, path.join(destPath, path.basename(targetPath, ".bz2"))];
+                } else if (lowerPath.endsWith(".xz")) {
+                    args = ["sh", "-c", 'xz -dc "$0" > "$1"', targetPath, path.join(destPath, path.basename(targetPath, ".xz"))];
+                } else if (lowerPath.endsWith(".zst")) {
+                    args = ["sh", "-c", 'zstd -dc "$0" > "$1"', targetPath, path.join(destPath, path.basename(targetPath, ".zst"))];
+                } else if (lowerPath.endsWith(".lzma")) {
+                    args = ["sh", "-c", 'lzma -dc "$0" > "$1"', targetPath, path.join(destPath, path.basename(targetPath, ".lzma"))];
+                } else {
+                    args = ["tar", "-xf", targetPath, "-C", destPath];
+                }
+
                 await sudoExec(args);
             });
 
@@ -493,7 +573,7 @@ exports.activate = (context) => {
         } catch (err) {
             if (!(err instanceof vscode.CancellationError)) {
                 log(`Extract failed: ${err.message}`, "ERROR");
-                vscode.window.showErrorMessage(`Failed`);
+                vscode.window.showErrorMessage(`Failed: ${err.message}`);
             }
         }
     }));
