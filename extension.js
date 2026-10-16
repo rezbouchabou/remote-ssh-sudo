@@ -396,18 +396,38 @@ exports.activate = (context) => {
             if (!mode) return;
             if (!validateChmodMode(mode)) throw new Error("Invalid format");
 
-            let recursive = false;
+            let scope = "Only Target(s)";
+            let isDirectory = false;
             for (const p of targetPaths) {
                 if (await pathExists(p) && (await fs.promises.stat(p)).isDirectory()) {
-                    recursive = (await vscode.window.showQuickPick(["No", "Yes"], { placeHolder: "Recursive (-R)?" })) === "Yes";
+                    isDirectory = true;
                     break;
                 }
             }
 
+            if (isDirectory) {
+                const choice = await vscode.window.showQuickPick(
+                    ["Only Target(s) (Standard)", "Recursive: Folders & Files (-R)", "Recursive: Folders Only", "Recursive: Files Only"],
+                    { placeHolder: "Select scope for permissions" }
+                );
+                if (!choice) return;
+                scope = choice;
+            }
+
             await withProgress("Updating permissions...", async () => {
-                const args = ["chmod"];
-                if (recursive) args.push("-R");
-                await sudoExec([...args, mode, ...targetPaths]);
+                if (scope === "Recursive: Folders Only") {
+                    for (const p of targetPaths) {
+                        await sudoExec(["sh", "-c", 'find "$1" -type d -exec chmod "$0" {} +', mode, p]);
+                    }
+                } else if (scope === "Recursive: Files Only") {
+                    for (const p of targetPaths) {
+                        await sudoExec(["sh", "-c", 'find "$1" -type f -exec chmod "$0" {} +', mode, p]);
+                    }
+                } else {
+                    const args = ["chmod"];
+                    if (scope === "Recursive: Folders & Files (-R)") args.push("-R");
+                    await sudoExec([...args, mode, ...targetPaths]);
+                }
             });
 
             vscode.window.showInformationMessage(`Success`);
@@ -429,18 +449,38 @@ exports.activate = (context) => {
             if (!owner) return;
             if (!validateOwnerFormat(owner)) throw new Error("Invalid format");
 
-            let recursive = false;
+            let scope = "Only Target(s)";
+            let isDirectory = false;
             for (const p of targetPaths) {
                 if (await pathExists(p) && (await fs.promises.stat(p)).isDirectory()) {
-                    recursive = (await vscode.window.showQuickPick(["No", "Yes"], { placeHolder: "Recursive (-R)?" })) === "Yes";
+                    isDirectory = true;
                     break;
                 }
             }
 
+            if (isDirectory) {
+                const choice = await vscode.window.showQuickPick(
+                    ["Only Target(s) (Standard)", "Recursive: Folders & Files (-R)", "Recursive: Folders Only", "Recursive: Files Only"],
+                    { placeHolder: "Select scope for ownership" }
+                );
+                if (!choice) return;
+                scope = choice;
+            }
+
             await withProgress("Updating ownership...", async () => {
-                const args = ["chown"];
-                if (recursive) args.push("-R");
-                await sudoExec([...args, owner, ...targetPaths]);
+                if (scope === "Recursive: Folders Only") {
+                    for (const p of targetPaths) {
+                        await sudoExec(["sh", "-c", 'find "$1" -type d -exec chown "$0" {} +', owner, p]);
+                    }
+                } else if (scope === "Recursive: Files Only") {
+                    for (const p of targetPaths) {
+                        await sudoExec(["sh", "-c", 'find "$1" -type f -exec chown "$0" {} +', owner, p]);
+                    }
+                } else {
+                    const args = ["chown"];
+                    if (scope === "Recursive: Folders & Files (-R)") args.push("-R");
+                    await sudoExec([...args, owner, ...targetPaths]);
+                }
             });
 
             vscode.window.showInformationMessage(`Success`);
