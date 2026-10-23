@@ -2,8 +2,6 @@
 
 Add, edit, save, delete, move, compress, extract, and change permissions/ownership of protected files and folders with sudo/root privileges while using the VS Code Remote - SSH extension.
 
-(https://github.com/user-attachments/assets/1bb2fb20-df90-4e1b-bcd0-72b906b131e5)
-
 If you frequently work on remote Linux servers and need to edit system configuration files (like `/etc/nginx/nginx.conf` or `/etc/fstab`), or fix web server file ownership (like `www-data`), this extension saves you from having to drop into the terminal. You can manage protected files, directories, and their permissions directly from the comfort of the VS Code editor!
 
 ## Features
