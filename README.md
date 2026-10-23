@@ -2,11 +2,11 @@
 
 Add, edit, save, delete, move, compress, extract, and change permissions/ownership of protected files and folders with sudo/root privileges while using the VS Code Remote - SSH extension.
 
-<img width="1536" height="836" alt="Screencast from 2026-10-23 22-04-03" src="https://github.com/user-attachments/assets/4aaf86b4-050c-4531-b201-e9a9d62b9a0e" />
+<img width="auto" height="auto" alt="" src="https://github.com/user-attachments/assets/4aaf86b4-050c-4531-b201-e9a9d62b9a0e" />
 
 If you frequently work on remote Linux servers and need to edit system configuration files (like `/etc/nginx/nginx.conf` or `/etc/fstab`), or fix web server file ownership (like `www-data`), this extension saves you from having to drop into the terminal. You can manage protected files, directories, and their permissions directly from the comfort of the VS Code editor!
 
-<img width="1188" height="608" alt="cmd" src="https://github.com/user-attachments/assets/c4655422-256a-4571-afff-134bf3410a1c" />
+<img width="auto" height="auto" alt="cmd" src="https://github.com/user-attachments/assets/c4655422-256a-4571-afff-134bf3410a1c" />
 
 ## Features
 
@@ -14,7 +14,7 @@ This extension adds several commands to VS Code, allowing you to bypass permissi
 
 * **Save as Root / User:** Save the currently open protected file using `sudo`. Icons appear in the **Editor Actions Title bar** for quick access! (Default Hotkey: `Ctrl+Shift+Alt+S`)
 
-<img width="1188" height="171" alt="editor" src="https://github.com/user-attachments/assets/48d66270-6579-48c6-925d-6a89aad69617" />
+<img width="auto" height="auto" alt="" src="https://github.com/user-attachments/assets/48d66270-6579-48c6-925d-6a89aad69617" />
 
 * **Multi-Selection Support:** Apply actions (Delete, Compress, Chmod, Chown, Move) to dozens of files and folders at the exact same time.
 * **Move as Root:** Move protected files or directories with smart path prediction and automatic destination folder creation.
@@ -27,8 +27,6 @@ This extension adds several commands to VS Code, allowing you to bypass permissi
 
 ### Explorer Context Menu Integration
 You don't need to memorize commands! You can simply right-click in the VS Code File Explorer to access the full suite of management tools.
-
-<img width="754" height="608" alt="menu" src="https://github.com/user-attachments/assets/ac8738e3-d99c-470c-8d78-ef28e667013d" />
 
 ## How It Works
 
