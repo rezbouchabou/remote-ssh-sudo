@@ -6,8 +6,6 @@ Add, edit, save, delete, move, compress, extract, and change permissions/ownersh
 
 If you frequently work on remote Linux servers and need to edit system configuration files (like `/etc/nginx/nginx.conf` or `/etc/fstab`), or fix web server file ownership (like `www-data`), this extension saves you from having to drop into the terminal. You can manage protected files, directories, and their permissions directly from the comfort of the VS Code editor!
 
-<img width="1188" height="608" alt="cmd" src="https://github.com/user-attachments/assets/562aebda-6ff1-4ea9-843e-ee70b85809dd" />
-
 ## Features
 
 This extension adds several commands to VS Code, allowing you to bypass permission denied errors seamlessly:
