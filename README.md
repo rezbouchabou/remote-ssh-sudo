@@ -10,6 +10,8 @@ If you frequently work on remote Linux servers and need to edit system configura
 
 This extension adds several commands to VS Code, allowing you to bypass permission denied errors seamlessly:
 
+<img width="auto" height="auto" alt="" src="https://github.com/user-attachments/assets/c4655422-256a-4571-afff-134bf3410a1c" />
+
 * **Save as Root / User:** Save the currently open protected file using `sudo`. Icons appear in the **Editor Actions Title bar** for quick access! (Default Hotkey: `Ctrl+Shift+Alt+S`)
 
 <img width="auto" height="auto" alt="" src="https://github.com/user-attachments/assets/48d66270-6579-48c6-925d-6a89aad69617" />
